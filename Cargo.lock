@@ -535,6 +535,7 @@ dependencies = [
 [[package]]
 name = "homie-device"
 version = "0.4.0"
+source = "git+https://github.com/alsuren/mijia-homie/?branch=hasnode#f4d74ea864eddd3ba25dec786b5aee80403dc1a9"
 dependencies = [
  "async-channel",
  "futures",
