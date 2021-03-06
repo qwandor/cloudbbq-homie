@@ -1,8 +1,3 @@
 /target
 cloudbbq-homie.toml
-homie-influx.toml
-mijia-history-influx.toml
-mijia-homie.toml
-mappings.toml
-sensor-names.toml
 .DS_Store
