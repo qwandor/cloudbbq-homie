@@ -1,18 +1,25 @@
 mod config;
 
 use crate::config::{get_mqtt_options, get_tls_client_config, Config};
-use bluez_async::{BluetoothSession, MacAddress};
+use bluez_async::{BluetoothSession, DeviceInfo, MacAddress};
 use cloudbbq::{find_devices, BBQDevice, RealTimeData, SettingResult};
 use eyre::{bail, Report};
+use futures::future::try_join_all;
 use futures::stream::StreamExt;
 use futures::{select, TryFutureExt};
 use homie_device::{HomieDevice, Node, Property};
 use rumqttc::ClientConfig;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::{time, try_join};
+use tokio::{task, time, try_join};
 
 const SCAN_DURATION: Duration = Duration::from_secs(5);
+
+const NODE_ID_BATTERY: &str = "battery";
+const PROPERTY_ID_VOLTAGE: &str = "voltage";
+const PROPERTY_ID_PERCENTAGE: &str = "percentage";
+const NODE_ID_PROBE_PREFIX: &str = "probe";
+const PROPERTY_ID_TEMPERATURE: &str = "temperature";
 
 #[tokio::main]
 async fn main() -> Result<(), Report> {
@@ -52,22 +59,13 @@ async fn run_system(
         bail!("No devices found");
     }
 
-    let mut bbqs = vec![];
+    let mut join_handles = vec![];
     for device in devices {
-        log::info!("Connecting to {:?}...", device);
-        session.connect(&device.id).await?;
-        let connected_device = BBQDevice::new(session.clone(), device.id).await?;
-        log::info!("Authenticating...");
-        connected_device.authenticate().await?;
-        log::info!("Authenticated.");
-        let bbq = BBQ {
-            mac_address: device.mac_address,
-            name: device.name.unwrap(),
-            device: connected_device,
-        };
-        bbq.run(config, tls_client_config.clone()).await?;
-        bbqs.push(bbq);
+        let bbq = BBQ::connect(session, device).await?;
+        let handle = task::spawn(bbq.run(config.to_owned(), tls_client_config.clone()));
+        join_handles.push(handle);
     }
+    try_join_all(join_handles).await?;
 
     Ok(())
 }
@@ -79,16 +77,26 @@ struct BBQ {
     device: BBQDevice,
 }
 
-const NODE_ID_BATTERY: &str = "battery";
-const PROPERTY_ID_VOLTAGE: &str = "voltage";
-const PROPERTY_ID_PERCENTAGE: &str = "percentage";
-const NODE_ID_PROBE_PREFIX: &str = "probe";
-const PROPERTY_ID_TEMPERATURE: &str = "temperature";
-
 impl BBQ {
+    /// Attempt to connect to the given Barbecue thermometer device and authenticate with it.
+    async fn connect(session: &BluetoothSession, device: DeviceInfo) -> Result<BBQ, Report> {
+        log::info!("Connecting to {:?}...", device);
+        session.connect(&device.id).await?;
+        let connected_device = BBQDevice::new(session.clone(), device.id).await?;
+        log::info!("Authenticating...");
+        connected_device.authenticate().await?;
+        log::info!("Authenticated.");
+        Ok(BBQ {
+            mac_address: device.mac_address,
+            name: device.name.unwrap(),
+            device: connected_device,
+        })
+    }
+
+    /// Create a Homie device for the Barbecue thermometer, and keep publishing updates.
     async fn run(
-        &self,
-        config: &Config,
+        self,
+        config: Config,
         tls_client_config: Option<Arc<ClientConfig>>,
     ) -> Result<(), Report> {
         let device_id_suffix = self.mac_address.to_string().replace(":", "");
