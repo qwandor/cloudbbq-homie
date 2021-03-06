@@ -143,7 +143,7 @@ impl BBQ {
         result: SettingResult,
         homie: &mut HomieDevice,
     ) -> Result<(), Report> {
-        println!("Setting result: {:?}", result);
+        log::trace!("Setting result: {:?}", result);
         match result {
             SettingResult::BatteryLevel {
                 current_voltage,
@@ -167,7 +167,7 @@ impl BBQ {
         data: RealTimeData,
         homie: &mut HomieDevice,
     ) -> Result<(), Report> {
-        println!("Realtime data: {:?}", data);
+        log::trace!("Realtime data: {:?}", data);
         for (probe_index, temperature) in data.probe_temperatures.into_iter().enumerate() {
             let node_id = format!("{}{}", NODE_ID_PROBE_PREFIX, probe_index);
             let exists = homie.has_node(&node_id);
