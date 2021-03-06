@@ -3,7 +3,7 @@ name: Package
 on:
   push:
     branches: [master]
-    tags: ["homie-influx-*", "mijia-homie-*"]
+    tags: ["*"]
 
 env:
   CARGO_TERM_COLOR: always
@@ -79,7 +79,7 @@ jobs:
     name: Draft release
     runs-on: ubuntu-latest
     needs: build
-    if: github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/homie-influx-') || startsWith(github.ref, 'refs/tags/mijia-homie-'))
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download packages
         uses: actions/download-artifact@v2
@@ -90,7 +90,7 @@ jobs:
         uses: actions-ecosystem/action-regex-match@v2
         with:
           text: ${{ github.ref }}
-          regex: "^refs/tags/(homie-influx|mijia-homie)-(.+)$"
+          regex: "^refs/tags/(.+)$"
       - name: Create draft release
         id: create_release
         uses: actions/create-release@v1
@@ -98,7 +98,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions.
         with:
           tag_name: ${{ github.ref }}
-          release_name: ${{ steps.parse_tag.outputs.group1 }} release ${{ steps.parse_tag.outputs.group2 }}
+          release_name: ${{ steps.parse_tag.outputs.group1 }}
           draft: true
           prerelease: false
       - name: Upload packages to release

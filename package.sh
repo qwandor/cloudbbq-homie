@@ -7,10 +7,10 @@ set -euo pipefail
 TARGET=${TARGET:-}
 
 if [ -z "$TARGET" ]; then
-  cd mijia-homie
+  cd cloudbbq-homie
   cargo deb
 else
-  cross build --release --target "$TARGET" --bin mijia-homie
-  cd mijia-homie
+  cross build --release --target "$TARGET" --bin cloudbbq-homie
+  cd cloudbbq-homie
   cargo deb --target "$TARGET" --no-build
 fi
