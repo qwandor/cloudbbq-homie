@@ -3,6 +3,7 @@
 members = [
     "bluez-async",
     "bluez-generated",
+    "cloudbbq-homie",
     "homie-controller",
     "homie-device",
     "homie-influx",

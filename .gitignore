@@ -1,4 +1,5 @@
 /target
+cloudbbq-homie.toml
 homie-influx.toml
 mijia-history-influx.toml
 mijia-homie.toml
