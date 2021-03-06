@@ -17,3 +17,7 @@ client_prefix="cloudbbq"
 #password=""
 # Whether to use TLS for the connection to the MQTT broker.
 use_tls=false
+
+[device."00:11:22:aa:bb:cc"]
+name = "Barbecue thermometer"
+probe_names = ["First probe", "Second probe"]

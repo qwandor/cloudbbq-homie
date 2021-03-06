@@ -1,8 +1,12 @@
+use bluez_async::MacAddress;
 use eyre::Report;
 use rumqttc::{MqttOptions, TlsConfiguration, Transport};
 use rustls::ClientConfig;
+use serde::de::Error as _;
+use serde::{Deserialize as _, Deserializer};
 use serde_derive::Deserialize;
 use stable_eyre::eyre::WrapErr;
+use std::collections::HashMap;
 use std::fs::read_to_string;
 use std::sync::Arc;
 
@@ -18,6 +22,8 @@ const CONFIG_FILENAME: &str = "cloudbbq-homie.toml";
 pub struct Config {
     pub mqtt: MqttConfig,
     pub homie: HomieConfig,
+    #[serde(deserialize_with = "de_device_map", rename = "device")]
+    pub devices: HashMap<MacAddress, DeviceConfig>,
 }
 
 impl Config {
@@ -70,6 +76,27 @@ impl Default for HomieConfig {
             prefix: DEFAULT_MQTT_PREFIX.to_owned(),
         }
     }
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct DeviceConfig {
+    pub name: Option<String>,
+    pub probe_names: Vec<String>,
+}
+
+pub fn de_device_map<'de, D: Deserializer<'de>>(
+    d: D,
+) -> Result<HashMap<MacAddress, DeviceConfig>, D::Error> {
+    let map: HashMap<String, DeviceConfig> = HashMap::deserialize(d)?;
+    map.into_iter()
+        .map(|(mac_address, device_config)| {
+            Ok((
+                mac_address.parse().map_err(D::Error::custom)?,
+                device_config,
+            ))
+        })
+        .collect()
 }
 
 /// Construct a `ClientConfig` for TLS connections to the MQTT broker, if TLS is enabled.

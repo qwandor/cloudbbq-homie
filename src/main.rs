@@ -1,6 +1,6 @@
 mod config;
 
-use crate::config::{get_mqtt_options, get_tls_client_config, Config};
+use crate::config::{get_mqtt_options, get_tls_client_config, Config, DeviceConfig};
 use bluez_async::{BluetoothSession, DeviceInfo, MacAddress};
 use cloudbbq::{find_devices, BBQDevice, RealTimeData, SettingResult};
 use eyre::{bail, Report};
@@ -61,8 +61,8 @@ async fn run_system(
 
     let mut join_handles = vec![];
     for device in devices {
-        let bbq = BBQ::connect(session, device).await?;
-        let handle = task::spawn(bbq.run(config.to_owned(), tls_client_config.clone()));
+        let bbq = BBQ::connect(session, device, config.to_owned()).await?;
+        let handle = task::spawn(bbq.run(tls_client_config.clone()));
         join_handles.push(handle);
     }
     try_join_all(join_handles).await?;
@@ -73,38 +73,51 @@ async fn run_system(
 #[derive(Debug)]
 struct BBQ {
     mac_address: MacAddress,
+    config: Config,
+    device_config: DeviceConfig,
     name: String,
     device: BBQDevice,
 }
 
 impl BBQ {
     /// Attempt to connect to the given Barbecue thermometer device and authenticate with it.
-    async fn connect(session: &BluetoothSession, device: DeviceInfo) -> Result<BBQ, Report> {
+    async fn connect(
+        session: &BluetoothSession,
+        device: DeviceInfo,
+        config: Config,
+    ) -> Result<BBQ, Report> {
         log::info!("Connecting to {:?}...", device);
         session.connect(&device.id).await?;
         let connected_device = BBQDevice::new(session.clone(), device.id).await?;
         log::info!("Authenticating...");
         connected_device.authenticate().await?;
         log::info!("Authenticated.");
+
+        let device_config = config
+            .devices
+            .get(&device.mac_address)
+            .cloned()
+            .unwrap_or_default();
+        // Use the configured name if there is one, otherwise the Bluetooth device name.
+        let name = device_config.name.clone().unwrap_or(device.name.unwrap());
         Ok(BBQ {
             mac_address: device.mac_address,
-            name: device.name.unwrap(),
+            config,
+            device_config,
+            name,
             device: connected_device,
         })
     }
 
     /// Create a Homie device for the Barbecue thermometer, and keep publishing updates.
-    async fn run(
-        self,
-        config: Config,
-        tls_client_config: Option<Arc<ClientConfig>>,
-    ) -> Result<(), Report> {
+    async fn run(self, tls_client_config: Option<Arc<ClientConfig>>) -> Result<(), Report> {
         let device_id_suffix = self.mac_address.to_string().replace(":", "");
         let device_base = format!(
             "{}/{}-{}",
-            config.homie.prefix, config.homie.device_id_prefix, device_id_suffix
+            self.config.homie.prefix, self.config.homie.device_id_prefix, device_id_suffix
         );
-        let mqtt_options = get_mqtt_options(&config.mqtt, &device_id_suffix, tls_client_config);
+        let mqtt_options =
+            get_mqtt_options(&self.config.mqtt, &device_id_suffix, tls_client_config);
         let mut homie_builder = HomieDevice::builder(&device_base, &self.name, mqtt_options);
         homie_builder.set_firmware(env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
         let (mut homie, homie_handle) = homie_builder.spawn().await?;
@@ -173,10 +186,16 @@ impl BBQ {
             let exists = homie.has_node(&node_id);
             if let Some(temperature) = temperature {
                 if !exists {
+                    let default_probe_name = format!("Probe {}", probe_index + 1);
+                    let probe_name = self
+                        .device_config
+                        .probe_names
+                        .get(probe_index)
+                        .unwrap_or(&default_probe_name);
                     homie
                         .add_node(Node::new(
                             &node_id,
-                            &format!("Probe {}", probe_index + 1),
+                            probe_name,
                             "Temperature probe",
                             vec![Property::float(
                                 PROPERTY_ID_TEMPERATURE,
