@@ -1,12 +1,13 @@
 use crate::config::{get_mqtt_options, Config, DeviceConfig};
 use bluez_async::{BluetoothSession, DeviceInfo, MacAddress};
 use cloudbbq::{BBQDevice, RealTimeData, SettingResult};
-use eyre::Report;
+use eyre::{bail, Report};
 use futures::select;
 use futures::stream::StreamExt;
 use homie_device::{HomieDevice, Node, Property};
 use rumqttc::ClientConfig;
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
 const NODE_ID_BATTERY: &str = "battery";
@@ -126,15 +127,9 @@ impl BBQ {
                     PROPERTY_ID_TARGET_TEMPERATURE => {
                         target.temperature = value.parse().ok()?;
                     }
-                    PROPERTY_ID_TARGET_MODE => match value.as_ref() {
-                        TARGET_MODE_NONE => {
-                            target.mode = TargetMode::None;
-                        }
-                        TARGET_MODE_SINGLE => {
-                            target.mode = TargetMode::Single;
-                        }
-                        _ => return None,
-                    },
+                    PROPERTY_ID_TARGET_MODE => {
+                        target.mode = value.parse().ok()?;
+                    }
                     _ => return None,
                 };
                 target.clone()
@@ -261,6 +256,18 @@ struct Target {
 enum TargetMode {
     None,
     Single,
+}
+
+impl FromStr for TargetMode {
+    type Err = Report;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            TARGET_MODE_NONE => Ok(Self::None),
+            TARGET_MODE_SINGLE => Ok(Self::Single),
+            _ => bail!("Invalid target mode {}", s),
+        }
+    }
 }
 
 impl Default for TargetMode {
