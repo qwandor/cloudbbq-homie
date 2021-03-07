@@ -1,6 +1,6 @@
 use crate::config::{get_mqtt_options, Config, DeviceConfig};
 use bluez_async::{BluetoothSession, DeviceInfo, MacAddress};
-use cloudbbq::{BBQDevice, RealTimeData, SettingResult};
+use cloudbbq::{BBQDevice, RealTimeData, SettingResult, TemperatureUnit};
 use eyre::{bail, Report};
 use futures::select;
 use futures::stream::StreamExt;
@@ -13,6 +13,13 @@ use std::sync::{Arc, Mutex};
 const NODE_ID_BATTERY: &str = "battery";
 const PROPERTY_ID_VOLTAGE: &str = "voltage";
 const PROPERTY_ID_PERCENTAGE: &str = "percentage";
+
+const NODE_ID_DISPLAY: &str = "display";
+const PROPERTY_ID_DISPLAY_UNIT: &str = "unit";
+const DISPLAY_UNIT_CELCIUS: &str = "ºC";
+const DISPLAY_UNIT_FAHRENHEIT: &str = "ºF";
+const DISPLAY_UNITS: [&str; 2] = [DISPLAY_UNIT_CELCIUS, DISPLAY_UNIT_FAHRENHEIT];
+
 const NODE_ID_PROBE_PREFIX: &str = "probe";
 const PROPERTY_ID_TEMPERATURE: &str = "temperature";
 const PROPERTY_ID_TARGET_TEMPERATURE: &str = "target";
@@ -82,6 +89,8 @@ impl BBQ {
         });
         let (mut homie, homie_handle) = homie_builder.spawn().await?;
         homie.ready().await?;
+
+        // Add nodes other than probes.
         homie
             .add_node(Node::new(
                 NODE_ID_BATTERY,
@@ -92,6 +101,31 @@ impl BBQ {
                     Property::integer(PROPERTY_ID_PERCENTAGE, "Percentage", false, Some("%"), None),
                 ],
             ))
+            .await?;
+        homie
+            .add_node(Node::new(
+                NODE_ID_DISPLAY,
+                "Display",
+                "Display settings",
+                vec![Property::enumeration(
+                    PROPERTY_ID_DISPLAY_UNIT,
+                    "Unit",
+                    true,
+                    None,
+                    &DISPLAY_UNITS,
+                )],
+            ))
+            .await?;
+        // Default to Celcius.
+        self.device
+            .set_temperature_unit(TemperatureUnit::Celcius)
+            .await?;
+        homie
+            .publish_value(
+                NODE_ID_DISPLAY,
+                PROPERTY_ID_DISPLAY_UNIT,
+                DISPLAY_UNIT_CELCIUS,
+            )
             .await?;
 
         let mut setting_results = self.device.setting_results().await?.fuse();
@@ -119,7 +153,11 @@ impl BBQ {
         value: String,
     ) -> Option<String> {
         log::trace!("{}/{} = {}", node_id, property_id, value);
-        if let Some(probe_index) = probe_id_to_index(&node_id) {
+        if node_id == NODE_ID_DISPLAY && property_id == PROPERTY_ID_DISPLAY_UNIT {
+            let unit = parse_display_unit(&value)?;
+            device.set_temperature_unit(unit).await.ok()?;
+            Some(value)
+        } else if let Some(probe_index) = probe_id_to_index(&node_id) {
             let target = {
                 let state = &mut *target_state.lock().unwrap();
                 let target = state.targets.entry(probe_index).or_default();
@@ -285,4 +323,12 @@ impl Default for TargetMode {
 
 fn probe_id_to_index(probe_id: &str) -> Option<u8> {
     probe_id.strip_prefix(NODE_ID_PROBE_PREFIX)?.parse().ok()
+}
+
+fn parse_display_unit(value: &str) -> Option<TemperatureUnit> {
+    match value {
+        DISPLAY_UNIT_CELCIUS => Some(TemperatureUnit::Celcius),
+        DISPLAY_UNIT_FAHRENHEIT => Some(TemperatureUnit::Fahrenheit),
+        _ => None,
+    }
 }
