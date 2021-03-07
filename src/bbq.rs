@@ -119,6 +119,27 @@ impl BBQ {
         Ok(())
     }
 
+    fn node_for_probe(&self, node_id: &str, probe_index: usize) -> Node {
+        let default_probe_name = format!("Probe {}", probe_index + 1);
+        let probe_name = self
+            .device_config
+            .probe_names
+            .get(probe_index)
+            .unwrap_or(&default_probe_name);
+        Node::new(
+            node_id,
+            probe_name,
+            "Temperature probe",
+            vec![Property::float(
+                PROPERTY_ID_TEMPERATURE,
+                "Temperature",
+                false,
+                Some("ºC"),
+                None,
+            )],
+        )
+    }
+
     async fn handle_realtime_data(
         &self,
         data: RealTimeData,
@@ -130,25 +151,8 @@ impl BBQ {
             let exists = homie.has_node(&node_id);
             if let Some(temperature) = temperature {
                 if !exists {
-                    let default_probe_name = format!("Probe {}", probe_index + 1);
-                    let probe_name = self
-                        .device_config
-                        .probe_names
-                        .get(probe_index)
-                        .unwrap_or(&default_probe_name);
                     homie
-                        .add_node(Node::new(
-                            &node_id,
-                            probe_name,
-                            "Temperature probe",
-                            vec![Property::float(
-                                PROPERTY_ID_TEMPERATURE,
-                                "Temperature",
-                                false,
-                                Some("ºC"),
-                                None,
-                            )],
-                        ))
+                        .add_node(self.node_for_probe(&node_id, probe_index))
                         .await?;
                 }
                 homie
