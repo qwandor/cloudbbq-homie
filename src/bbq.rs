@@ -13,6 +13,7 @@ const PROPERTY_ID_VOLTAGE: &str = "voltage";
 const PROPERTY_ID_PERCENTAGE: &str = "percentage";
 const NODE_ID_PROBE_PREFIX: &str = "probe";
 const PROPERTY_ID_TEMPERATURE: &str = "temperature";
+const PROPERTY_ID_TARGET_TEMPERATURE: &str = "target";
 
 #[derive(Debug)]
 pub struct BBQ {
@@ -64,6 +65,11 @@ impl BBQ {
             get_mqtt_options(&self.config.mqtt, &device_id_suffix, tls_client_config);
         let mut homie_builder = HomieDevice::builder(&device_base, &self.name, mqtt_options);
         homie_builder.set_firmware(env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+        let device_clone = self.device.clone();
+        homie_builder.set_update_callback(move |node_id, property_id, value| {
+            let device_clone = device_clone.clone();
+            async { Self::handle_update(device_clone, node_id, property_id, value).await }
+        });
         let (mut homie, homie_handle) = homie_builder.spawn().await?;
         homie.ready().await?;
         homie
@@ -93,6 +99,25 @@ impl BBQ {
         }
 
         Ok(())
+    }
+
+    async fn handle_update(
+        device: BBQDevice,
+        node_id: String,
+        property_id: String,
+        value: String,
+    ) -> Option<String> {
+        if let (Some(probe_index), PROPERTY_ID_TARGET_TEMPERATURE) =
+            (probe_id_to_index(&node_id), property_id.as_ref())
+        {
+            device
+                .set_target_temp(probe_index, value.parse().ok()?)
+                .await
+                .ok()?;
+            Some(value)
+        } else {
+            None
+        }
     }
 
     async fn handle_setting_result(
@@ -130,13 +155,22 @@ impl BBQ {
             node_id,
             probe_name,
             "Temperature probe",
-            vec![Property::float(
-                PROPERTY_ID_TEMPERATURE,
-                "Temperature",
-                false,
-                Some("ºC"),
-                None,
-            )],
+            vec![
+                Property::float(
+                    PROPERTY_ID_TEMPERATURE,
+                    "Temperature",
+                    false,
+                    Some("ºC"),
+                    None,
+                ),
+                Property::float(
+                    PROPERTY_ID_TARGET_TEMPERATURE,
+                    "Target temperature",
+                    true,
+                    Some("ºC"),
+                    None,
+                ),
+            ],
         )
     }
 
@@ -164,4 +198,8 @@ impl BBQ {
         }
         Ok(())
     }
+}
+
+fn probe_id_to_index(probe_id: &str) -> Option<u8> {
+    probe_id.strip_prefix(NODE_ID_PROBE_PREFIX)?.parse().ok()
 }
