@@ -6,7 +6,8 @@ use futures::select;
 use futures::stream::StreamExt;
 use homie_device::{HomieDevice, Node, Property};
 use rumqttc::ClientConfig;
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 const NODE_ID_BATTERY: &str = "battery";
 const PROPERTY_ID_VOLTAGE: &str = "voltage";
@@ -14,6 +15,10 @@ const PROPERTY_ID_PERCENTAGE: &str = "percentage";
 const NODE_ID_PROBE_PREFIX: &str = "probe";
 const PROPERTY_ID_TEMPERATURE: &str = "temperature";
 const PROPERTY_ID_TARGET_TEMPERATURE: &str = "target";
+const PROPERTY_ID_TARGET_MODE: &str = "mode";
+const TARGET_MODE_NONE: &str = "None";
+const TARGET_MODE_SINGLE: &str = "Target";
+const TARGET_MODES: [&str; 2] = [TARGET_MODE_NONE, TARGET_MODE_SINGLE];
 
 #[derive(Debug)]
 pub struct BBQ {
@@ -66,9 +71,13 @@ impl BBQ {
         let mut homie_builder = HomieDevice::builder(&device_base, &self.name, mqtt_options);
         homie_builder.set_firmware(env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
         let device_clone = self.device.clone();
+        let target_state = Arc::new(Mutex::new(TargetState::default()));
         homie_builder.set_update_callback(move |node_id, property_id, value| {
             let device_clone = device_clone.clone();
-            async { Self::handle_update(device_clone, node_id, property_id, value).await }
+            let target_state = target_state.clone();
+            async {
+                Self::handle_update(device_clone, target_state, node_id, property_id, value).await
+            }
         });
         let (mut homie, homie_handle) = homie_builder.spawn().await?;
         homie.ready().await?;
@@ -103,18 +112,44 @@ impl BBQ {
 
     async fn handle_update(
         device: BBQDevice,
+        target_state: Arc<Mutex<TargetState>>,
         node_id: String,
         property_id: String,
         value: String,
     ) -> Option<String> {
         log::trace!("{}/{} = {}", node_id, property_id, value);
-        if let (Some(probe_index), PROPERTY_ID_TARGET_TEMPERATURE) =
-            (probe_id_to_index(&node_id), property_id.as_ref())
-        {
-            device
-                .set_target_temp(probe_index, value.parse().ok()?)
-                .await
-                .ok()?;
+        if let Some(probe_index) = probe_id_to_index(&node_id) {
+            let target = {
+                let state = &mut *target_state.lock().unwrap();
+                let target = state.targets.entry(probe_index).or_default();
+                match property_id.as_ref() {
+                    PROPERTY_ID_TARGET_TEMPERATURE => {
+                        target.temperature = value.parse().ok()?;
+                    }
+                    PROPERTY_ID_TARGET_MODE => match value.as_ref() {
+                        TARGET_MODE_NONE => {
+                            target.mode = TargetMode::None;
+                        }
+                        TARGET_MODE_SINGLE => {
+                            target.mode = TargetMode::Single;
+                        }
+                        _ => return None,
+                    },
+                    _ => return None,
+                };
+                target.clone()
+            };
+            match target.mode {
+                TargetMode::None => {
+                    //TODO: Remove target temperature.
+                }
+                TargetMode::Single => {
+                    device
+                        .set_target_temp(probe_index, target.temperature)
+                        .await
+                        .ok()?;
+                }
+            }
             Some(value)
         } else {
             None
@@ -171,6 +206,13 @@ impl BBQ {
                     Some("ºC"),
                     None,
                 ),
+                Property::enumeration(
+                    PROPERTY_ID_TARGET_MODE,
+                    "Target mode",
+                    true,
+                    None,
+                    &TARGET_MODES,
+                ),
             ],
         )
     }
@@ -198,6 +240,32 @@ impl BBQ {
             }
         }
         Ok(())
+    }
+}
+
+/// The target temperatures set for each probe.
+#[derive(Debug, Default)]
+struct TargetState {
+    /// Map from probe index to target settings.
+    targets: HashMap<u8, Target>,
+}
+
+/// The target mode and temperature for a single probe.
+#[derive(Clone, Default, Debug)]
+struct Target {
+    mode: TargetMode,
+    temperature: f32,
+}
+
+#[derive(Copy, Clone, Debug)]
+enum TargetMode {
+    None,
+    Single,
+}
+
+impl Default for TargetMode {
+    fn default() -> Self {
+        TargetMode::None
     }
 }
 
