@@ -107,6 +107,7 @@ impl BBQ {
         property_id: String,
         value: String,
     ) -> Option<String> {
+        log::trace!("{}/{} = {}", node_id, property_id, value);
         if let (Some(probe_index), PROPERTY_ID_TARGET_TEMPERATURE) =
             (probe_id_to_index(&node_id), property_id.as_ref())
         {
