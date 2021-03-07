@@ -226,6 +226,13 @@ impl BBQ {
                     homie
                         .add_node(self.node_for_probe(&node_id, probe_index))
                         .await?;
+                    // Send default values for settable properties.
+                    homie
+                        .publish_value(&node_id, PROPERTY_ID_TARGET_MODE, TARGET_MODE_NONE)
+                        .await?;
+                    homie
+                        .publish_value(&node_id, PROPERTY_ID_TARGET_TEMPERATURE, 0.0)
+                        .await?;
                 }
                 homie
                     .publish_value(&node_id, PROPERTY_ID_TEMPERATURE, temperature)
