@@ -155,7 +155,10 @@ impl BBQ {
         log::trace!("{}/{} = {}", node_id, property_id, value);
         if node_id == NODE_ID_DISPLAY && property_id == PROPERTY_ID_DISPLAY_UNIT {
             let unit = parse_display_unit(&value)?;
-            device.set_temperature_unit(unit).await.ok()?;
+            if let Err(e) = device.set_temperature_unit(unit).await {
+                log::error!("Failed to set temperature unit: {}", e);
+                return None;
+            }
             Some(value)
         } else if let Some(probe_index) = probe_id_to_index(&node_id) {
             let target = {
@@ -177,10 +180,13 @@ impl BBQ {
                     //TODO: Remove target temperature.
                 }
                 TargetMode::Single => {
-                    device
+                    if let Err(e) = device
                         .set_target_temp(probe_index, target.temperature)
                         .await
-                        .ok()?;
+                    {
+                        log::error!("Failed to set target temperature: {}", e);
+                        return None;
+                    }
                 }
             }
             Some(value)
