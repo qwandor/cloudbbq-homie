@@ -7,6 +7,8 @@ Bluetooth BBQ thermometer, and send its readings to an MQTT broker following the
 with [homie-influx](https://github.com/alsuren/mijia-homie/tree/master/homie-influx), or integrate
 with various other [compatible tools](https://homieiot.github.io/implementations/#controller).
 
+This is not an officially supported Google product.
+
 ## Usage
 
 1. Copy `cloudbbq-homie.example.toml` to `cloudbbq-homie.toml` and edit it to configure your MQTT
