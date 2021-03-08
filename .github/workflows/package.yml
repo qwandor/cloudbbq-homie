@@ -62,11 +62,7 @@ jobs:
           use-cross: true
           command: build
           args: --release --target ${{ matrix.target }}
-      - name: Package homie-influx
-        working-directory: homie-influx
-        run: cargo deb --target ${{ matrix.target }} --no-build
-      - name: Package mijia-homie
-        working-directory: mijia-homie
+      - name: Package
         run: cargo deb --target ${{ matrix.target }} --no-build
 
       - name: Upload package
