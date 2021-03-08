@@ -5,12 +5,13 @@
 use crate::config::{get_mqtt_options, Config, DeviceConfig};
 use bluez_async::{BluetoothSession, DeviceInfo, MacAddress};
 use cloudbbq::{BBQDevice, RealTimeData, SettingResult, TemperatureUnit};
-use eyre::{bail, Report};
+use eyre::{bail, Report, WrapErr};
 use futures::select;
 use futures::stream::StreamExt;
 use homie_device::{HomieDevice, Node, Property};
 use rumqttc::ClientConfig;
 use std::collections::HashMap;
+use std::fmt::{self, Debug, Display, Formatter};
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
@@ -39,6 +40,7 @@ pub struct BBQ {
     device_config: DeviceConfig,
     name: String,
     device: BBQDevice,
+    target_state: Arc<Mutex<TargetState>>,
 }
 
 impl BBQ {
@@ -68,6 +70,7 @@ impl BBQ {
             device_config,
             name,
             device: connected_device,
+            target_state: Arc::new(Mutex::new(TargetState::default())),
         })
     }
 
@@ -83,7 +86,7 @@ impl BBQ {
         let mut homie_builder = HomieDevice::builder(&device_base, &self.name, mqtt_options);
         homie_builder.set_firmware(env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
         let device_clone = self.device.clone();
-        let target_state = Arc::new(Mutex::new(TargetState::default()));
+        let target_state = self.target_state.clone();
         homie_builder.set_update_callback(move |node_id, property_id, value| {
             let device_clone = device_clone.clone();
             let target_state = target_state.clone();
@@ -167,7 +170,7 @@ impl BBQ {
         } else if let Some(probe_index) = probe_id_to_index(&node_id) {
             let target = {
                 let state = &mut *target_state.lock().unwrap();
-                let target = state.targets.entry(probe_index).or_default();
+                let target = state.target(probe_index);
                 match property_id.as_ref() {
                     PROPERTY_ID_TARGET_TEMPERATURE => {
                         target.temperature = value.parse().ok()?;
@@ -179,15 +182,7 @@ impl BBQ {
                 };
                 target.clone()
             };
-            if let Err(e) = match target.mode {
-                // TODO: Use remove_target once it exists.
-                TargetMode::None => device.set_target_temp(probe_index, 302.0).await,
-                TargetMode::Single => {
-                    device
-                        .set_target_temp(probe_index, target.temperature)
-                        .await
-                }
-            } {
+            if let Err(e) = set_target(&device, probe_index, &target).await {
                 log::error!("Failed to set target temperature: {}", e);
                 return None;
             }
@@ -221,12 +216,12 @@ impl BBQ {
         Ok(())
     }
 
-    fn node_for_probe(&self, node_id: &str, probe_index: usize) -> Node {
+    fn node_for_probe(&self, node_id: &str, probe_index: u8) -> Node {
         let default_probe_name = format!("Probe {}", probe_index + 1);
         let probe_name = self
             .device_config
             .probe_names
-            .get(probe_index)
+            .get(probe_index as usize)
             .unwrap_or(&default_probe_name);
         Node::new(
             node_id,
@@ -269,7 +264,7 @@ impl BBQ {
             let exists = homie.has_node(&node_id);
             if let Some(temperature) = temperature {
                 if !exists {
-                    self.add_probe(homie, probe_index, &node_id).await?;
+                    self.add_probe(homie, probe_index as u8, &node_id).await?;
                 }
                 homie
                     .publish_value(&node_id, PROPERTY_ID_TEMPERATURE, temperature)
@@ -284,27 +279,43 @@ impl BBQ {
     async fn add_probe(
         &self,
         homie: &mut HomieDevice,
-        probe_index: usize,
+        probe_index: u8,
         node_id: &str,
     ) -> Result<(), Report> {
         homie
             .add_node(self.node_for_probe(&node_id, probe_index))
             .await?;
 
-        // Remove target temperature, if there is one.
-        // TODO: Use remove_target once it exists.
-        self.device
-            .set_target_temp(probe_index as u8, 302.0)
+        // Restore the target temperature to its previous value, or none.
+        let target = self
+            .target_state
+            .lock()
+            .unwrap()
+            .target(probe_index)
+            .clone();
+        set_target(&self.device, probe_index, &target).await?;
+        homie
+            .publish_value(&node_id, PROPERTY_ID_TARGET_MODE, target.mode)
             .await?;
         homie
-            .publish_value(&node_id, PROPERTY_ID_TARGET_MODE, TARGET_MODE_NONE)
-            .await?;
-        homie
-            .publish_value(&node_id, PROPERTY_ID_TARGET_TEMPERATURE, 0.0)
+            .publish_value(&node_id, PROPERTY_ID_TARGET_TEMPERATURE, target.temperature)
             .await?;
 
         Ok(())
     }
+}
+
+async fn set_target(device: &BBQDevice, probe_index: u8, target: &Target) -> Result<(), Report> {
+    match target.mode {
+        // TODO: Use remove_target once it exists.
+        TargetMode::None => device.set_target_temp(probe_index, 302.0).await,
+        TargetMode::Single => {
+            device
+                .set_target_temp(probe_index, target.temperature)
+                .await
+        }
+    }
+    .wrap_err("Failed to set target temperature")
 }
 
 /// The target temperatures set for each probe.
@@ -312,6 +323,12 @@ impl BBQ {
 struct TargetState {
     /// Map from probe index to target settings.
     targets: HashMap<u8, Target>,
+}
+
+impl TargetState {
+    fn target(&mut self, probe_index: u8) -> &mut Target {
+        self.targets.entry(probe_index).or_default()
+    }
 }
 
 /// The target mode and temperature for a single probe.
@@ -336,6 +353,21 @@ impl FromStr for TargetMode {
             TARGET_MODE_SINGLE => Ok(Self::Single),
             _ => bail!("Invalid target mode {}", s),
         }
+    }
+}
+
+impl TargetMode {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::None => TARGET_MODE_NONE,
+            Self::Single => TARGET_MODE_SINGLE,
+        }
+    }
+}
+
+impl Display for TargetMode {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.write_str(self.as_str())
     }
 }
 
