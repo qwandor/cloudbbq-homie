@@ -179,19 +179,17 @@ impl BBQ {
                 };
                 target.clone()
             };
-            match target.mode {
-                TargetMode::None => {
-                    //TODO: Remove target temperature.
-                }
+            if let Err(e) = match target.mode {
+                // TODO: Use remove_target once it exists.
+                TargetMode::None => device.set_target_temp(probe_index, 302.0).await,
                 TargetMode::Single => {
-                    if let Err(e) = device
+                    device
                         .set_target_temp(probe_index, target.temperature)
                         .await
-                    {
-                        log::error!("Failed to set target temperature: {}", e);
-                        return None;
-                    }
                 }
+            } {
+                log::error!("Failed to set target temperature: {}", e);
+                return None;
             }
             Some(value)
         } else {
@@ -271,16 +269,7 @@ impl BBQ {
             let exists = homie.has_node(&node_id);
             if let Some(temperature) = temperature {
                 if !exists {
-                    homie
-                        .add_node(self.node_for_probe(&node_id, probe_index))
-                        .await?;
-                    // Send default values for settable properties.
-                    homie
-                        .publish_value(&node_id, PROPERTY_ID_TARGET_MODE, TARGET_MODE_NONE)
-                        .await?;
-                    homie
-                        .publish_value(&node_id, PROPERTY_ID_TARGET_TEMPERATURE, 0.0)
-                        .await?;
+                    self.add_probe(homie, probe_index, &node_id).await?;
                 }
                 homie
                     .publish_value(&node_id, PROPERTY_ID_TEMPERATURE, temperature)
@@ -289,6 +278,31 @@ impl BBQ {
                 homie.remove_node(&node_id).await?;
             }
         }
+        Ok(())
+    }
+
+    async fn add_probe(
+        &self,
+        homie: &mut HomieDevice,
+        probe_index: usize,
+        node_id: &str,
+    ) -> Result<(), Report> {
+        homie
+            .add_node(self.node_for_probe(&node_id, probe_index))
+            .await?;
+
+        // Remove target temperature, if there is one.
+        // TODO: Use remove_target once it exists.
+        self.device
+            .set_target_temp(probe_index as u8, 302.0)
+            .await?;
+        homie
+            .publish_value(&node_id, PROPERTY_ID_TARGET_MODE, TARGET_MODE_NONE)
+            .await?;
+        homie
+            .publish_value(&node_id, PROPERTY_ID_TARGET_TEMPERATURE, 0.0)
+            .await?;
+
         Ok(())
     }
 }
