@@ -1,4 +1,8 @@
 #!/bin/bash
+#
+# Copyright 2020 the cloudbbq-homie authors.
+# This project is dual-licensed under Apache 2.0 and MIT terms.
+# See LICENSE-APACHE and LICENSE-MIT for details.
 
 # Build a Debian package for the given target, or the default host target if none is set.
 

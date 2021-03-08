@@ -1,3 +1,7 @@
+// Copyright 2021 the cloudbbq-homie authors.
+// This project is dual-licensed under Apache 2.0 and MIT terms.
+// See LICENSE-APACHE and LICENSE-MIT for details.
+
 use crate::config::{get_mqtt_options, Config, DeviceConfig};
 use bluez_async::{BluetoothSession, DeviceInfo, MacAddress};
 use cloudbbq::{BBQDevice, RealTimeData, SettingResult, TemperatureUnit};
