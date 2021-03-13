@@ -230,9 +230,9 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "cloudbbq"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d01953977b82335da0d11d7771d845d89617139b81a3b83e3bbcb5eaabc14b7"
+checksum = "5b75fc05e82d1c279339ab5d726d62c37952e5b37dd8abfbe895fe6c3cf1115b"
 dependencies = [
  "bluez-async",
  "futures",

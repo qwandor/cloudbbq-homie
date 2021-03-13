@@ -27,11 +27,13 @@ const DISPLAY_UNITS: [&str; 2] = [DISPLAY_UNIT_CELCIUS, DISPLAY_UNIT_FAHRENHEIT]
 
 const NODE_ID_PROBE_PREFIX: &str = "probe";
 const PROPERTY_ID_TEMPERATURE: &str = "temperature";
-const PROPERTY_ID_TARGET_TEMPERATURE: &str = "target";
+const PROPERTY_ID_TARGET_TEMPERATURE_MIN: &str = "target_min";
+const PROPERTY_ID_TARGET_TEMPERATURE_MAX: &str = "target_max";
 const PROPERTY_ID_TARGET_MODE: &str = "mode";
 const TARGET_MODE_NONE: &str = "None";
-const TARGET_MODE_SINGLE: &str = "Target";
-const TARGET_MODES: [&str; 2] = [TARGET_MODE_NONE, TARGET_MODE_SINGLE];
+const TARGET_MODE_SINGLE: &str = "Maximum only";
+const TARGET_MODE_RANGE: &str = "Range";
+const TARGET_MODES: [&str; 3] = [TARGET_MODE_NONE, TARGET_MODE_SINGLE, TARGET_MODE_RANGE];
 
 #[derive(Debug)]
 pub struct BBQ {
@@ -172,8 +174,11 @@ impl BBQ {
                 let state = &mut *target_state.lock().unwrap();
                 let target = state.target(probe_index);
                 match property_id.as_ref() {
-                    PROPERTY_ID_TARGET_TEMPERATURE => {
-                        target.temperature = value.parse().ok()?;
+                    PROPERTY_ID_TARGET_TEMPERATURE_MIN => {
+                        target.temperature_min = value.parse().ok()?;
+                    }
+                    PROPERTY_ID_TARGET_TEMPERATURE_MAX => {
+                        target.temperature_max = value.parse().ok()?;
                     }
                     PROPERTY_ID_TARGET_MODE => {
                         target.mode = value.parse().ok()?;
@@ -236,8 +241,15 @@ impl BBQ {
                     None,
                 ),
                 Property::float(
-                    PROPERTY_ID_TARGET_TEMPERATURE,
-                    "Target temperature",
+                    PROPERTY_ID_TARGET_TEMPERATURE_MIN,
+                    "Minimum temperature",
+                    true,
+                    Some("ºC"),
+                    None,
+                ),
+                Property::float(
+                    PROPERTY_ID_TARGET_TEMPERATURE_MAX,
+                    "Target/maximum temperature",
                     true,
                     Some("ºC"),
                     None,
@@ -298,7 +310,18 @@ impl BBQ {
             .publish_value(&node_id, PROPERTY_ID_TARGET_MODE, target.mode)
             .await?;
         homie
-            .publish_value(&node_id, PROPERTY_ID_TARGET_TEMPERATURE, target.temperature)
+            .publish_value(
+                &node_id,
+                PROPERTY_ID_TARGET_TEMPERATURE_MIN,
+                target.temperature_min,
+            )
+            .await?;
+        homie
+            .publish_value(
+                &node_id,
+                PROPERTY_ID_TARGET_TEMPERATURE_MAX,
+                target.temperature_max,
+            )
             .await?;
 
         Ok(())
@@ -311,7 +334,12 @@ async fn set_target(device: &BBQDevice, probe_index: u8, target: &Target) -> Res
         TargetMode::None => device.set_target_temp(probe_index, 302.0).await,
         TargetMode::Single => {
             device
-                .set_target_temp(probe_index, target.temperature)
+                .set_target_temp(probe_index, target.temperature_max)
+                .await
+        }
+        TargetMode::Range => {
+            device
+                .set_target_range(probe_index, target.temperature_min..target.temperature_max)
                 .await
         }
     }
@@ -335,13 +363,15 @@ impl TargetState {
 #[derive(Clone, Default, Debug)]
 struct Target {
     mode: TargetMode,
-    temperature: f32,
+    temperature_min: f32,
+    temperature_max: f32,
 }
 
 #[derive(Copy, Clone, Debug)]
 enum TargetMode {
     None,
     Single,
+    Range,
 }
 
 impl FromStr for TargetMode {
@@ -351,6 +381,7 @@ impl FromStr for TargetMode {
         match s {
             TARGET_MODE_NONE => Ok(Self::None),
             TARGET_MODE_SINGLE => Ok(Self::Single),
+            TARGET_MODE_RANGE => Ok(Self::Range),
             _ => bail!("Invalid target mode {}", s),
         }
     }
@@ -361,6 +392,7 @@ impl TargetMode {
         match self {
             Self::None => TARGET_MODE_NONE,
             Self::Single => TARGET_MODE_SINGLE,
+            Self::Range => TARGET_MODE_RANGE,
         }
     }
 }
