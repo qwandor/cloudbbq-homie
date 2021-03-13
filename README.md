@@ -15,9 +15,11 @@ This is not an officially supported Google product.
    broker and other details. The comments there should explain what the fields do.
 2. Turn on your BBQ thermometer.
 3. Run `cloudbbq-homie` from the same directory as the config file.
-4. Try connecting to your MQTT try connecting to your MQTT broker with a
+4. Try connecting to your MQTT broker with a
    [Homie controller](https://homieiot.github.io/implementations/#controller) such as
-   [HoDD](https://rroemhild.github.io/hodd/) to see your probe values.
+   [HoDD](https://rroemhild.github.io/hodd/) to see your probe values. Or use
+   [homie-influx](https://crates.io/crates/homie-influx) to store the readings in InfluxDB so you
+   can draw charts with Grafana.
 
 ## License
 
