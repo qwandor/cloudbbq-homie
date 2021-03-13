@@ -5,8 +5,8 @@ authors = ["Andrew Walbran <qwandor@google.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
 description = "Service to connect to barbecue thermometers over Bluetooth and report their readings to an MQTT broker following the Homie convention."
-repository = "https://github.com/alsuren/mijia-homie/"
-keywords = ["ble", "bluetooth", "homie", "mqtt"]
+repository = "https://github.com/qwandor/cloudbbq-homie/"
+keywords = ["bbq", "ble", "bluetooth", "homie", "mqtt"]
 categories = ["network-programming"]
 
 [dependencies]
