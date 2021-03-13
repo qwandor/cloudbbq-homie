@@ -1,3 +1,4 @@
 /target
 cloudbbq-homie.toml
 .DS_Store
+.vscode
