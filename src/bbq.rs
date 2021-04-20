@@ -19,8 +19,9 @@ const NODE_ID_BATTERY: &str = "battery";
 const PROPERTY_ID_VOLTAGE: &str = "voltage";
 const PROPERTY_ID_PERCENTAGE: &str = "percentage";
 
-const NODE_ID_DISPLAY: &str = "display";
+const NODE_ID_SETTINGS: &str = "settings";
 const PROPERTY_ID_DISPLAY_UNIT: &str = "unit";
+const PROPERTY_ID_ALARM: &str = "alarm";
 const DISPLAY_UNIT_CELCIUS: &str = "ºC";
 const DISPLAY_UNIT_FAHRENHEIT: &str = "ºF";
 const DISPLAY_UNITS: [&str; 2] = [DISPLAY_UNIT_CELCIUS, DISPLAY_UNIT_FAHRENHEIT];
@@ -106,23 +107,34 @@ impl BBQ {
                 "Battery",
                 "Battery level",
                 vec![
-                    Property::integer(PROPERTY_ID_VOLTAGE, "Voltage", false, None, None),
-                    Property::integer(PROPERTY_ID_PERCENTAGE, "Percentage", false, Some("%"), None),
+                    Property::integer(PROPERTY_ID_VOLTAGE, "Voltage", false, true, None, None),
+                    Property::integer(
+                        PROPERTY_ID_PERCENTAGE,
+                        "Percentage",
+                        false,
+                        true,
+                        Some("%"),
+                        None,
+                    ),
                 ],
             ))
             .await?;
         homie
             .add_node(Node::new(
-                NODE_ID_DISPLAY,
-                "Display",
-                "Display settings",
-                vec![Property::enumeration(
-                    PROPERTY_ID_DISPLAY_UNIT,
-                    "Unit",
-                    true,
-                    None,
-                    &DISPLAY_UNITS,
-                )],
+                NODE_ID_SETTINGS,
+                "Settings",
+                "Settings",
+                vec![
+                    Property::enumeration(
+                        PROPERTY_ID_DISPLAY_UNIT,
+                        "Unit",
+                        true,
+                        true,
+                        None,
+                        &DISPLAY_UNITS,
+                    ),
+                    Property::boolean(PROPERTY_ID_ALARM, "Alarm", true, false, None),
+                ],
             ))
             .await?;
         // Default to Celcius.
@@ -131,7 +143,7 @@ impl BBQ {
             .await?;
         homie
             .publish_value(
-                NODE_ID_DISPLAY,
+                NODE_ID_SETTINGS,
                 PROPERTY_ID_DISPLAY_UNIT,
                 DISPLAY_UNIT_CELCIUS,
             )
@@ -162,13 +174,24 @@ impl BBQ {
         value: String,
     ) -> Option<String> {
         log::trace!("{}/{} = {}", node_id, property_id, value);
-        if node_id == NODE_ID_DISPLAY && property_id == PROPERTY_ID_DISPLAY_UNIT {
+        if node_id == NODE_ID_SETTINGS && property_id == PROPERTY_ID_DISPLAY_UNIT {
             let unit = parse_display_unit(&value)?;
             if let Err(e) = device.set_temperature_unit(unit).await {
                 log::error!("Failed to set temperature unit: {}", e);
                 return None;
             }
             Some(value)
+        } else if node_id == NODE_ID_SETTINGS && property_id == PROPERTY_ID_ALARM {
+            let state: bool = value.parse().ok()?;
+            if !state {
+                if let Err(e) = device.silence_alarm().await {
+                    log::error!("Failed to silence alarm: {}", e);
+                    return None;
+                }
+                Some(value)
+            } else {
+                None
+            }
         } else if let Some(probe_index) = probe_id_to_index(&node_id) {
             let target = {
                 let state = &mut *target_state.lock().unwrap();
@@ -237,12 +260,14 @@ impl BBQ {
                     PROPERTY_ID_TEMPERATURE,
                     "Temperature",
                     false,
+                    true,
                     Some("ºC"),
                     None,
                 ),
                 Property::float(
                     PROPERTY_ID_TARGET_TEMPERATURE_MIN,
                     "Minimum temperature",
+                    true,
                     true,
                     Some("ºC"),
                     None,
@@ -251,12 +276,14 @@ impl BBQ {
                     PROPERTY_ID_TARGET_TEMPERATURE_MAX,
                     "Target/maximum temperature",
                     true,
+                    true,
                     Some("ºC"),
                     None,
                 ),
                 Property::enumeration(
                     PROPERTY_ID_TARGET_MODE,
                     "Target mode",
+                    true,
                     true,
                     None,
                     &TARGET_MODES,
