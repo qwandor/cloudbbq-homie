@@ -330,8 +330,7 @@ impl BBQ {
 
 async fn set_target(device: &BBQDevice, probe_index: u8, target: &Target) -> Result<(), Report> {
     match target.mode {
-        // TODO: Use remove_target once it exists.
-        TargetMode::None => device.set_target_temp(probe_index, 302.0).await,
+        TargetMode::None => device.remove_target(probe_index).await,
         TargetMode::Single => {
             device
                 .set_target_temp(probe_index, target.temperature_max)
