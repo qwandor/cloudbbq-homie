@@ -101,5 +101,5 @@ jobs:
         uses: shogo82148/actions-upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: "${{ steps.parse_tag.outputs.group1 }}_*.deb"
+          asset_path: "cloudbbq-homie_*.deb"
           asset_content_type: application/vnd.debian.binary-package
