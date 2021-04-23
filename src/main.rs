@@ -5,7 +5,7 @@
 mod bbq;
 mod config;
 
-use crate::bbq::BBQ;
+use crate::bbq::Bbq;
 use crate::config::{get_tls_client_config, Config};
 use bluez_async::BluetoothSession;
 use cloudbbq::find_devices;
@@ -59,7 +59,7 @@ async fn run_system(
 
     let mut join_handles = vec![];
     for device in devices {
-        let bbq = BBQ::connect(session, device, config.to_owned()).await?;
+        let bbq = Bbq::connect(session, device, config.to_owned()).await?;
         let handle = task::spawn(bbq.run(tls_client_config.clone()));
         join_handles.push(handle);
     }

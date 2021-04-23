@@ -6,8 +6,8 @@ use crate::config::{get_mqtt_options, Config, DeviceConfig};
 use bluez_async::{BluetoothSession, DeviceInfo, MacAddress};
 use cloudbbq::{BBQDevice, RealTimeData, SettingResult, TemperatureUnit};
 use eyre::{bail, Report, WrapErr};
-use futures::select;
 use futures::stream::StreamExt;
+use futures::{select, FutureExt};
 use homie_device::{HomieDevice, Node, Property};
 use rumqttc::ClientConfig;
 use std::collections::HashMap;
@@ -37,7 +37,7 @@ const TARGET_MODE_RANGE: &str = "Range";
 const TARGET_MODES: [&str; 3] = [TARGET_MODE_NONE, TARGET_MODE_SINGLE, TARGET_MODE_RANGE];
 
 #[derive(Debug)]
-pub struct BBQ {
+pub struct Bbq {
     mac_address: MacAddress,
     config: Config,
     device_config: DeviceConfig,
@@ -46,13 +46,13 @@ pub struct BBQ {
     target_state: Arc<Mutex<TargetState>>,
 }
 
-impl BBQ {
+impl Bbq {
     /// Attempt to connect to the given Barbecue thermometer device and authenticate with it.
     pub async fn connect(
         session: &BluetoothSession,
         device: DeviceInfo,
         config: Config,
-    ) -> Result<BBQ, Report> {
+    ) -> Result<Bbq, Report> {
         log::info!("Connecting to {:?}...", device);
         session.connect(&device.id).await?;
         let connected_device = BBQDevice::new(session.clone(), device.id).await?;
@@ -67,7 +67,7 @@ impl BBQ {
             .unwrap_or_default();
         // Use the configured name if there is one, otherwise the Bluetooth device name.
         let name = device_config.name.clone().unwrap_or(device.name.unwrap());
-        Ok(BBQ {
+        Ok(Bbq {
             mac_address: device.mac_address,
             config,
             device_config,
@@ -155,10 +155,13 @@ impl BBQ {
         // Request an initial battery level reading.
         self.device.request_battery_level().await?;
 
+        let mut homie_handle = homie_handle.fuse();
+
         loop {
             select! {
                 data = real_time_data.select_next_some() => self.handle_realtime_data(data, &mut homie).await?,
                 result = setting_results.select_next_some() => self.handle_setting_result(result, &mut homie).await?,
+                homie_result = homie_handle => return homie_result.wrap_err("Homie error"),
                 complete => break,
             };
         }
