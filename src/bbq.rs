@@ -239,6 +239,11 @@ impl BBQ {
                     .publish_value(NODE_ID_BATTERY, PROPERTY_ID_PERCENTAGE, percentage)
                     .await?;
             }
+            SettingResult::SilencePressed => {
+                homie
+                    .publish_nonretained_value(NODE_ID_SETTINGS, PROPERTY_ID_ALARM, false)
+                    .await?;
+            }
             _ => {}
         }
         Ok(())
