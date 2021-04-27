@@ -35,12 +35,13 @@ jobs:
         run: sudo apt-get install libdbus-1-dev
       - name: Install grcov
         run: curl -L https://github.com/mozilla/grcov/releases/latest/download/grcov-linux-x86_64.tar.bz2 | tar jxf -
+      - name: Install llvm-tools
+        run: rustup component add llvm-tools-preview
       - name: Run tests with coverage
         run: >-
-          CARGO_INCREMENTAL=0
-          RUSTDOCFLAGS="-Cpanic=abort"
-          RUSTFLAGS="-Zprofile -Ccodegen-units=1 -Copt-level=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests -Cpanic=abort"
           RUSTC_BOOTSTRAP=1
+          RUSTFLAGS="-Zinstrument-coverage"
+          LLVM_PROFILE_FILE="test-coverage-%p-%m.profraw"
           cargo test --verbose
       - name: Convert coverage
         run: ./grcov . -s . --binary-path target/debug/ -t lcov --branch --ignore-not-existing -o target/debug/lcov.info
