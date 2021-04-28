@@ -66,7 +66,8 @@ impl Bbq {
             .cloned()
             .unwrap_or_default();
         // Use the configured name if there is one, otherwise the Bluetooth device name.
-        let name = device_config.name.clone().unwrap_or(device.name.unwrap());
+        let bluetooth_device_name = device.name.unwrap();
+        let name = device_config.name.clone().unwrap_or(bluetooth_device_name);
         Ok(Bbq {
             mac_address: device.mac_address,
             config,
