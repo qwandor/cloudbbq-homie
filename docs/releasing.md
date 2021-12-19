@@ -12,3 +12,6 @@ To release a new version of `cloudbbq-homie`:
    Debian packages.
 5. Run `cargo publish`.
 6. Edit the release, add an appropriate description, and then publish it.
+7. As soon as the release is published, the packages should automatically be pushed to the
+   [Artifactory repository](https://homiers.jfrog.io/) by the
+   [Release workflow](https://github.com/qwandor/cloudbbq-homie/actions?query=workflow%3ARelease).
