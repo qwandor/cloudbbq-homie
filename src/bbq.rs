@@ -331,7 +331,7 @@ impl Bbq {
         node_id: &str,
     ) -> Result<(), Report> {
         homie
-            .add_node(self.node_for_probe(&node_id, probe_index))
+            .add_node(self.node_for_probe(node_id, probe_index))
             .await?;
 
         // Restore the target temperature to its previous value, or none.
@@ -343,18 +343,18 @@ impl Bbq {
             .clone();
         set_target(&self.device, probe_index, &target).await?;
         homie
-            .publish_value(&node_id, PROPERTY_ID_TARGET_MODE, target.mode)
+            .publish_value(node_id, PROPERTY_ID_TARGET_MODE, target.mode)
             .await?;
         homie
             .publish_value(
-                &node_id,
+                node_id,
                 PROPERTY_ID_TARGET_TEMPERATURE_MIN,
                 target.temperature_min,
             )
             .await?;
         homie
             .publish_value(
-                &node_id,
+                node_id,
                 PROPERTY_ID_TARGET_TEMPERATURE_MAX,
                 target.temperature_max,
             )
