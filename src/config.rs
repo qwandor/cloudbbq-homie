@@ -5,7 +5,7 @@
 use bluez_async::MacAddress;
 use eyre::Report;
 use rumqttc::{MqttOptions, TlsConfiguration, Transport};
-use rustls::ClientConfig;
+use rustls::{ClientConfig, RootCertStore};
 use serde::de::Error as _;
 use serde::{Deserialize as _, Deserializer};
 use serde_derive::Deserialize;
@@ -13,6 +13,7 @@ use stable_eyre::eyre::WrapErr;
 use std::collections::HashMap;
 use std::fs::read_to_string;
 use std::sync::Arc;
+use std::time::Duration;
 
 const DEFAULT_MQTT_PREFIX: &str = "homie";
 const DEFAULT_MQTT_CLIENT_PREFIX: &str = "cloudbbq";
@@ -20,6 +21,7 @@ const DEFAULT_DEVICE_ID_PREFIX: &str = "cloudbbq";
 const DEFAULT_HOST: &str = "test.mosquitto.org";
 const DEFAULT_PORT: u16 = 1883;
 const CONFIG_FILENAME: &str = "cloudbbq-homie.toml";
+const KEEP_ALIVE: Duration = Duration::from_secs(5);
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -106,9 +108,16 @@ pub fn de_device_map<'de, D: Deserializer<'de>>(
 /// Construct a `ClientConfig` for TLS connections to the MQTT broker, if TLS is enabled.
 pub fn get_tls_client_config(config: &MqttConfig) -> Option<Arc<ClientConfig>> {
     if config.use_tls {
-        let mut client_config = ClientConfig::new();
-        client_config.root_store = rustls_native_certs::load_native_certs()
-            .expect("Failed to load platform certificates.");
+        let mut root_store = RootCertStore::empty();
+        for cert in
+            rustls_native_certs::load_native_certs().expect("Failed to load platform certificates.")
+        {
+            root_store.add(&rustls::Certificate(cert.0)).unwrap();
+        }
+        let client_config = ClientConfig::builder()
+            .with_safe_defaults()
+            .with_root_certificates(root_store)
+            .with_no_client_auth();
         Some(Arc::new(client_config))
     } else {
         None
@@ -124,7 +133,7 @@ pub fn get_mqtt_options(
 ) -> MqttOptions {
     let client_name = format!("{}-{}", config.client_prefix, client_name_suffix);
     let mut mqtt_options = MqttOptions::new(client_name, &config.host, config.port);
-    mqtt_options.set_keep_alive(5);
+    mqtt_options.set_keep_alive(KEEP_ALIVE);
 
     if let (Some(username), Some(password)) = (&config.username, &config.password) {
         mqtt_options.set_credentials(username, password);
