@@ -80,7 +80,7 @@ impl Bbq {
 
     /// Create a Homie device for the Barbecue thermometer, and keep publishing updates.
     pub async fn run(self, tls_client_config: Option<Arc<ClientConfig>>) -> Result<(), Report> {
-        let device_id_suffix = self.mac_address.to_string().replace(":", "");
+        let device_id_suffix = self.mac_address.to_string().replace(':', "");
         let device_base = format!(
             "{}/{}-{}",
             self.config.homie.prefix, self.config.homie.device_id_prefix, device_id_suffix
