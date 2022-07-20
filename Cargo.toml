@@ -13,7 +13,7 @@ categories = ["network-programming"]
 backoff = { version = "0.4.0", features = ["tokio"] }
 color-backtrace = "0.5.1"
 cloudbbq = "0.2.0"
-bluez-async = "0.3.1"
+bluez-async = "0.5.5"
 eyre = "0.6.5"
 futures = "0.3.8"
 futures-channel = "0.3.21"
