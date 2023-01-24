@@ -12,7 +12,7 @@ use cloudbbq::find_devices;
 use eyre::{bail, Report};
 use futures::future::try_join_all;
 use futures::TryFutureExt;
-use rumqttc::ClientConfig;
+use rustls::ClientConfig;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::{task, time, try_join};

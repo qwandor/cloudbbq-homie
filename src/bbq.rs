@@ -9,7 +9,7 @@ use eyre::{bail, Report, WrapErr};
 use futures::stream::StreamExt;
 use futures::{select, FutureExt};
 use homie_device::{HomieDevice, Node, Property};
-use rumqttc::ClientConfig;
+use rustls::ClientConfig;
 use std::collections::HashMap;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::str::FromStr;
