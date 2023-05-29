@@ -182,7 +182,7 @@ dependencies = [
  "itertools",
  "log",
  "pretty_env_logger",
- "rumqttc",
+ "rumqttc 0.21.0",
  "rustls",
  "rustls-native-certs",
  "serde",
@@ -456,7 +456,7 @@ dependencies = [
  "local_ipaddress",
  "log",
  "mac_address",
- "rumqttc",
+ "rumqttc 0.20.0",
  "thiserror",
  "tokio",
 ]
@@ -862,6 +862,23 @@ dependencies = [
  "futures",
  "log",
  "pollster",
+ "rustls-native-certs",
+ "rustls-pemfile",
+ "thiserror",
+ "tokio",
+ "tokio-rustls",
+]
+
+[[package]]
+name = "rumqttc"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "04483567c64bb8a9d64364a0a9437215a056a2b886140fd66e62a12394cf5998"
+dependencies = [
+ "bytes",
+ "flume",
+ "futures",
+ "log",
  "rustls-native-certs",
  "rustls-pemfile",
  "thiserror",
