@@ -402,8 +402,9 @@ struct Target {
     temperature_max: f32,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Default)]
 enum TargetMode {
+    #[default]
     None,
     Single,
     Range,
@@ -435,12 +436,6 @@ impl TargetMode {
 impl Display for TargetMode {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.write_str(self.as_str())
-    }
-}
-
-impl Default for TargetMode {
-    fn default() -> Self {
-        TargetMode::None
     }
 }
 
