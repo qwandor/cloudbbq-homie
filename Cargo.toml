@@ -28,7 +28,7 @@ serde_derive = "1.0.118"
 serde = "1.0.202"
 stable-eyre = "0.2.1"
 tokio = { version = "1.37.0", features = ["io-util", "macros", "rt-multi-thread"] }
-toml = "0.8.12"
+toml = "0.8.13"
 url = { version = "2.5.0", features = ["serde"] }
 
 [package.metadata.deb]
