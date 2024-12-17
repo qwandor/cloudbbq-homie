@@ -12,8 +12,8 @@ categories = ["network-programming"]
 [dependencies]
 backoff = { version = "0.4.0", features = ["tokio"] }
 color-backtrace = "0.6.1"
-cloudbbq = "0.3.0"
-bluez-async = "0.7.2"
+cloudbbq = "0.4.0"
+bluez-async = "0.8.0"
 eyre = "0.6.12"
 futures = "0.3.31"
 futures-channel = "0.3.31"
