@@ -53,7 +53,7 @@ impl Bbq {
         device: DeviceInfo,
         config: Config,
     ) -> Result<Bbq, Report> {
-        log::info!("Connecting to {:?}...", device);
+        log::info!("Connecting to {device:?}...");
         session.connect(&device.id).await?;
         let connected_device = BBQDevice::new(session.clone(), device.id).await?;
         log::info!("Authenticating...");
@@ -177,11 +177,11 @@ impl Bbq {
         property_id: String,
         value: String,
     ) -> Option<String> {
-        log::trace!("{}/{} = {}", node_id, property_id, value);
+        log::trace!("{node_id}/{property_id} = {value}");
         if node_id == NODE_ID_SETTINGS && property_id == PROPERTY_ID_DISPLAY_UNIT {
             let unit = parse_display_unit(&value)?;
             if let Err(e) = device.set_temperature_unit(unit).await {
-                log::error!("Failed to set temperature unit: {}", e);
+                log::error!("Failed to set temperature unit: {e}");
                 return None;
             }
             Some(value)
@@ -189,7 +189,7 @@ impl Bbq {
             let state: bool = value.parse().ok()?;
             if !state {
                 if let Err(e) = device.silence_alarm().await {
-                    log::error!("Failed to silence alarm: {}", e);
+                    log::error!("Failed to silence alarm: {e}");
                     return None;
                 }
                 Some(value)
@@ -215,7 +215,7 @@ impl Bbq {
                 target.clone()
             };
             if let Err(e) = set_target(&device, probe_index, &target).await {
-                log::error!("Failed to set target temperature: {}", e);
+                log::error!("Failed to set target temperature: {e}");
                 return None;
             }
             Some(value)
@@ -229,7 +229,7 @@ impl Bbq {
         result: SettingResult,
         homie: &mut HomieDevice,
     ) -> Result<(), Report> {
-        log::trace!("Setting result: {:?}", result);
+        log::trace!("Setting result: {result:?}");
         match result {
             SettingResult::BatteryLevel {
                 current_voltage,
@@ -306,9 +306,9 @@ impl Bbq {
         data: RealTimeData,
         homie: &mut HomieDevice,
     ) -> Result<(), Report> {
-        log::trace!("Realtime data: {:?}", data);
+        log::trace!("Realtime data: {data:?}");
         for (probe_index, temperature) in data.probe_temperatures.into_iter().enumerate() {
-            let node_id = format!("{}{}", NODE_ID_PROBE_PREFIX, probe_index);
+            let node_id = format!("{NODE_ID_PROBE_PREFIX}{probe_index}");
             let exists = homie.has_node(&node_id);
             if let Some(temperature) = temperature {
                 if !exists {
