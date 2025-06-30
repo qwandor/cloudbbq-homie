@@ -2,12 +2,12 @@
 // This project is dual-licensed under Apache 2.0 and MIT terms.
 // See LICENSE-APACHE and LICENSE-MIT for details.
 
-use crate::config::{get_mqtt_options, Config, DeviceConfig};
+use crate::config::{Config, DeviceConfig, get_mqtt_options};
 use bluez_async::{BluetoothSession, DeviceInfo, MacAddress};
 use cloudbbq::{BBQDevice, RealTimeData, SettingResult, TemperatureUnit};
-use eyre::{bail, Report, WrapErr};
+use eyre::{Report, WrapErr, bail};
 use futures::stream::StreamExt;
-use futures::{select, FutureExt};
+use futures::{FutureExt, select};
 use homie_device::{HomieDevice, Node, Property};
 use rustls::ClientConfig;
 use std::collections::HashMap;

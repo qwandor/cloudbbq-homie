@@ -6,12 +6,12 @@ mod bbq;
 mod config;
 
 use crate::bbq::Bbq;
-use crate::config::{get_tls_client_config, Config};
+use crate::config::{Config, get_tls_client_config};
 use bluez_async::BluetoothSession;
 use cloudbbq::find_devices;
-use eyre::{bail, Report};
-use futures::future::try_join_all;
+use eyre::{Report, bail};
 use futures::TryFutureExt;
+use futures::future::try_join_all;
 use rustls::ClientConfig;
 use std::sync::Arc;
 use std::time::Duration;
