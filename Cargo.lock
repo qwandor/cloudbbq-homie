@@ -144,7 +144,7 @@ dependencies = [
 
 [[package]]
 name = "cloudbbq-homie"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "backoff",
  "bluez-async",
